@@ -93,35 +93,35 @@ python main.py --stage 4
 | 模块名称 | 核心职责说明 |
 | :--- | :--- |
 | **sampler.py** | **结构处理中心**：负责原子结构的扩胞 (Supercell) 和几何微扰 (Perturbation)。 |
-| **validator.py** | **物理预筛选**：在任务提交前进行拦截，确保没有严重的原子重叠构型。 |
-| **wrapper.py** | **模板引擎**：将采样后的结构数据自动填充进计算软件（如 HONPAS）的输入模板。 |
-| **scheduler.py** | **任务调度管家**：管理 Slurm 任务脚本生成、`sbatch` 提交及作业状态监控。 |
-| **extractor.py** | **结果自动采集**：支持 SCF 与 AIMD 模式，从 output 及轨迹文件中解析能量与力。 |
+| **validator.py** | **物理预筛选**：在提交计算前拦截原子重叠构型，减少无效计算成本。 |
+| **wrapper.py** | **HONPAS 模板引擎**：将采样结构自动填充至模板并关联相应的 PSF 赝势文件。 |
+| **scheduler.py** | **任务调度管家**：管理 Slurm 脚本生成、`sbatch` 提交及 HONPAS 作业状态监控。 |
+| **extractor.py** | **结果自动采集**：支持 SCF 与 AIMD 模式，解析 `output.log` 及轨迹文件提取能量/力。 |
 | **cleaner.py** | **质量控制 (QC)**：基于共价半径检查原子碰撞，自动剔除能量与力的统计离群帧。 |
-| **analyzer.py** | **高维特征分析**：计算 SOAP 化学描述符，并执行 PCA 或非线性 UMAP 降维。 |
-| **merger.py** | **数据聚合工具**：无损合并不同 batch 或不同模式（SCF/AIMD）生成的训练集。 |
+| **analyzer.py** | **特征分析**：利用 SOAP + UMAP/t-SNE 算法评估数据集对势能面的覆盖程度。 |
+| **merger.py** | **数据集聚合**：支持将不同采样模式下的 HONPAS 计算结果无损合并为统一训练集。 |
 | **visualizer.py** | **绘图组件**：提供能量/力分布直方图、降维空间散点图等可视化支持。 |
 | **workflows.py** | **工作流编排**：将各独立模块按业务逻辑串联，定义 Stage 1~4 的标准化操作。 |
-```
+
+---
 
 ### ⚠️ 注意事项 (Notes)
 
-1. **扩胞与计算量**：
+1. **扩胞与计算量控制**：
    - 在 Stage 1 执行时，程序会检测 `config.py` 中的 `SUPERCELL_SIZE`。
-   - **注意**：扩胞会成倍增加原子数，请根据 **HONPAS** 的计算效率和内存限制合理设置。建议先用小体系测试单步 SCF 耗时。
+   - **提醒**：扩胞会指数级增加原子数，请务必根据 **HONPAS** 的内存限制合理设置。建议先用小体系测试单步 SCF 耗时。
 
-2. **AIMD 数据提取的前提条件**：
-   - 使用 `--mode aimd` 提取数据时，`extractor` 依赖 `dpdata` 的 `siesta/aimd_output` 格式。
-   - **必须确保**：每个任务目录下除了 `output.log`，还必须包含同名的 **`.ANI`** (坐标轨迹) 和 **`.FA`** (受力轨迹) 文件，否则 `dpdata` 将无法解析出任何有效帧。
+2. **AIMD 数据提取前提**：
+   - 使用 `--mode aimd` 模式时，`extractor` 模块依赖 `dpdata` 的 `siesta/aimd_output` 格式。
+   - **必须确保**：每个任务目录下除了 `output.log`，还须包含同名的 **`.ANI`** (坐标轨迹) 和 **`.FA`** (受力轨迹) 文件，否则将无法解析有效帧。
 
-3. **原子类型顺序 (Atom Species Consistency)**：
-   - 在执行 Stage 4 合并不同来源的数据集（如 SCF 与 AIMD 合并）时，`dpdata` 会严格校验原子类型的顺序。
-   - **操作建议**：请确保所有计算模式下 `config.py` 中的 `SPECIES_MAP` 定义完全一致。如果原子顺序错乱，合并过程将会报错或导致训练出的势函数物理意义错误。
+3. **原子类型顺序一致性 (Species Consistency)**：
+   - 在执行 Stage 4 合并不同 batch 或模式（如 SCF 与 AIMD 合并）时，`dpdata` 会严格校验原子类型的顺序。
+   - **要求**：请确保所有计算任务使用完全一致的 `SPECIES_MAP` 定义。如果原子顺序不匹配，合并将失败或导致势函数物理意义错误。
 
-4. **物理合理性预筛选**：
-   - Stage 1 在生成微扰结构时会调用 `validator` 模块。如果设置的微扰幅度（`atom_pert_distance`）过大，可能导致大量结构因原子重叠被拦截。
-   - 如果发现生成的任务数少于预期，请适当减小微扰参数或调整 `QC_OVERLAP_THRESHOLD` 阈值。
+4. **可视化依赖**：
+   - Stage 3 的 UMAP 分析依赖 `umap-learn` 库。若运行报错，请检查是否已执行 `pip install umap-learn`。
+   - 对于样本量超过 2000 帧的数据集，降维计算可能需要 1-3 分钟。
 
-5. **可视化环境依赖**：
-   - Stage 3 的 UMAP 分析依赖 `umap-learn` 库。如果运行报错，请确保已执行 `pip install umap-learn`。
-   - 对于超过 2000 帧的大规模数据集，UMAP 的计算可能需要几分钟时间，请耐心等待。
+5. **物理预筛选拦截**：
+   - 若生成的任务数少于 `NUM_TASKS` 设置值，通常是因为 `validator` 拦截了过多原子重叠构型。请尝试减小微扰幅度或微调 `QC_OVERLAP_THRESHOLD`。
