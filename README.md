@@ -84,30 +84,40 @@ python main.py --stage 4
 
 ---
 
-## 目录结构说明
+### 📂 目录结构说明
 
 ```text
-├── config.py                # 核心配置文件
-├── main.py                  # 工作流入口
+├── config.py                # 全局核心配置文件
+├── main.py                  # 工作流总控程序入口
 ├── data/
-│   ├── raw/                 # 原始结构输入
-│   ├── training/            # 清洗后的 DeepMD 训练集
-│   └── analysis/            # UMAP/PCA 分析报告
-├── templates/               # 计算软件输入模板 (HONPAS/SIESTA等)
-└── modules/                 # 核心功能模块
+│   ├── raw/                 # 存放原始输入结构 (如 POSCAR)
+│   ├── training/            # 存放清洗后的 DeepMD 训练数据集
+│   └── analysis/            # 存放 UMAP/PCA 分析报告及图表
+├── templates/               # 计算软件输入模板 (HONPAS/SIESTA/PSF等)
+└── modules/                 # 平台核心逻辑功能模块
 ```
-平台的核心逻辑分布在 modules/ 文件夹中，各模块职责如下：
-模块名称	核心职责
-sampler.py	结构处理中心：负责扩胞 (Supercell) 和几何微扰 (Perturbation)。
-validator.py	预筛选闸门：在提交计算前，拦截原子重叠等不合理的物理构型。
-wrapper.py	模板引擎：将结构数据填入计算软件（如 HONPAS）的输入模板中。
-scheduler.py	任务管家：管理 Slurm 任务生成、sbatch 提交及作业状态监控。
-extractor.py	数据采集：支持 SCF 与 AIMD 模式，自动解析 output 与轨迹文件。
-cleaner.py	质量控制 (QC)：基于共价半径检查碰撞，剔除能量与力的离群帧。
-analyzer.py	特征提取：计算 SOAP 描述符，并进行 PCA 或非线性降维。
-merger.py	数据聚合：无损合并不同 batch 或不同模式（SCF/AIMD）的数据集。
-visualizer.py	绘图工具：提供能量/力分布直方图及构型空间散点图。
-workflows.py	工作流编排：将上述模块串联成 Stage 1~4 的标准操作流程。
+
+### ⚙️ 模块功能详解
+
+平台的业务逻辑高度模块化，各组件职责如下表所示：
+
+| 模块名称 | 核心职责说明 |
+| :--- | :--- |
+| **sampler.py** | **结构处理中心**：负责原子结构的扩胞 (Supercell) 和几何微扰 (Perturbation)。 |
+| **validator.py** | **物理预筛选**：在任务提交前进行拦截，确保没有严重的原子重叠构型。 |
+| **wrapper.py** | **模板引擎**：将采样后的结构数据自动填充进计算软件（如 HONPAS）的输入模板。 |
+| **scheduler.py** | **任务调度管家**：管理 Slurm 任务脚本生成、`sbatch` 提交及作业状态监控。 |
+| **extractor.py** | **结果自动采集**：支持 SCF 与 AIMD 模式，从 output 及轨迹文件中解析能量与力。 |
+| **cleaner.py** | **质量控制 (QC)**：基于共价半径检查原子碰撞，自动剔除能量与力的统计离群帧。 |
+| **analyzer.py** | **高维特征分析**：计算 SOAP 化学描述符，并执行 PCA 或非线性 UMAP 降维。 |
+| **merger.py** | **数据聚合工具**：无损合并不同 batch 或不同模式（SCF/AIMD）生成的训练集。 |
+| **visualizer.py** | **绘图组件**：提供能量/力分布直方图、降维空间散点图等可视化支持。 |
+| **workflows.py** | **工作流编排**：将各独立模块按业务逻辑串联，定义 Stage 1~4 的标准化操作。 |
+```
+
+### 提示：
+1. **表格语法**：Markdown 中使用 `|` 分隔列，使用 `| :--- |` 定义对齐方式。
+2. **代码块**：目录树建议放在 ` ```text ` 或 ` ```bash ` 块中，这样在 GitHub 上会有很好的等宽字体显示效果。
 ---
 
 ## 注意事项
