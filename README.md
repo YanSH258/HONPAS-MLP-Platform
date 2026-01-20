@@ -1,27 +1,16 @@
+**HAP-MLP-Platform** 是一款专为机器学习势函数（MLP）训练定制的自动化数据生产与分析平台。
 
-# HAP-MLP-Platform
-
-**HAP-MLP-Platform** 是一个集成化的机器学习势函数（MLP）训练数据生产与管理平台。它基于 `dpdata` 和 `ASE`，支持从结构采样、输入生成、任务提交、结果清洗到特征分析的全流程自动化。
-
-## 核心特性
-
-*   **智能采样**：支持扩胞（Supercell）与微扰（Perturbation），内置基于原子共价半径的碰撞检测。
-*   **多模式支持**：支持单点能（SCF）批量采样与动力学（AIMD）轨迹提取。
-*   **高性能清洗**：自动剔除原子重叠、能量离群值及受力异常帧。
-*   **高维分析**：集成 SOAP 描述符与 UMAP/t-SNE 算法，可视化训练集的构型空间覆盖率。
-*   **数据集管理**：支持多源数据集（SCF + AIMD）的一键合并。
+本平台以 **HONPAS**  作为底层高精度密度泛函理论（DFT）计算引擎。通过深度集成 HONPAS 的线性缩放计算特性，平台实现了从大规模构型采样到高性能数据集生成的全流程自动化，显著提升了训练数据的生产效率。
 
 ---
 
-## 运行环境
+## 🌟 核心特色 (Core Features)
 
-建议使用 `conda` 创建环境：
-
-```bash
-conda create -n hap_mlp python=3.9
-conda activate hap_mlp
-pip install dpdata ase dscribe scikit-learn umap-learn matplotlib
-```
+*   **HONPAS 原生集成**：针对 HONPAS 的输入输出格式进行深度适配，支持单点能（SCF）、结构优化（Relax）以及分子动力学（AIMD）轨迹的自动解析与数据提取。
+*   **智能结构采样**：支持基于 `dpdata` 的扩胞 (Supercell) 与微扰 (Perturbation) 逻辑，自动适配 HONPAS 赝势 (PSF) 文件。
+*   **物理准则质量控制**：内置基于元素共价半径的碰撞检测逻辑，确保输入 HONPAS 计算的构型具有物理合理性。
+*   **构型空间可视化**：集成 SOAP 描述符与 UMAP 非线性降维算法，直观展示 HONPAS 生成数据的构型空间覆盖率。
+*   **一键式工作流**：通过 Stage 1~4 的标准化指令，完成从“POSCAR 结构”到“DeepMD 训练集”的完整转换。
 
 ---
 
