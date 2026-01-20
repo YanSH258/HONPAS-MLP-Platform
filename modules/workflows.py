@@ -78,7 +78,7 @@ def run_stage_2_collect(mode="scf"):
 
     # 1. 提取
     extractor = ResultExtractor(current_workspace)
-    raw_data = extractor.collect_data()
+    raw_data = extractor.collect_data(mode=mode)
     
     if not raw_data:
         print("❌ 无有效数据。")
