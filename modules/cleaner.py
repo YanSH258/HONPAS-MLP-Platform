@@ -4,62 +4,61 @@ import os
 import dpdata
 from ase import Atoms
 from ase.geometry import get_distances
+from ase.data import covalent_radii, atomic_numbers 
 
 class DataQualityControl:
     def __init__(self, dp_system: dpdata.LabeledSystem):
-        """
-        :param dp_system: 原始的 dpdata.LabeledSystem 对象
-        """
         self.system = dp_system
         self.n_frames = len(dp_system)
-        # 初始时所有帧都被认为是有效的
         self.valid_mask = np.ones(self.n_frames, dtype=bool)
-        self.rejected_reasons = [] # 记录被剔除的原因
+        self.rejected_reasons = []
 
-    def check_atom_overlap(self, min_dist=0.8):
+    def check_atom_overlap(self, threshold_factor=0.5):
         """
-        物理合理性检查：剔除原子间距小于 min_dist 的帧
+        优化后的逻辑：基于共价半径之和的倍数检查重叠
+        threshold = threshold_factor * (R_i + R_j)
         """
-        print(f"[QC] 正在检查原子重叠 (阈值 < {min_dist} Ang)...")
+        print(f"[QC] 正在检查原子重叠 (阈值因子: {threshold_factor} * 共价半径之和)...")
         
         coords = self.system['coords']
         cells = self.system['cells']
         atom_types = self.system['atom_types']
         atom_names = self.system['atom_names']
-        # 将 atom_types 映射回元素符号，供 ASE 使用
+        
+        # 1. 预计算该体系的阈值矩阵
+        # 获取每个元素的共价半径
+        species_radii = [covalent_radii[atomic_numbers[name]] for name in atom_names]
+        # 映射到每一个原子
+        atom_radii = np.array([species_radii[t] for t in atom_types])
+        # 计算 N x N 的阈值矩阵: T_ij = factor * (r_i + r_j)
+        threshold_matrix = threshold_factor * (atom_radii[:, None] + atom_radii[None, :])
+        
         symbols = [atom_names[i] for i in atom_types]
-
         count = 0
+
         for i in range(self.n_frames):
             if not self.valid_mask[i]:
-                continue # 已经标记为无效的跳过
+                continue
 
-            # 构建 ASE Atoms 对象以处理周期性边界条件 (PBC)
+            # 构建 ASE 对象处理周期性边界 (MIC)
             atoms = Atoms(symbols=symbols, positions=coords[i], cell=cells[i], pbc=True)
             
-            # 计算所有原子对的距离 (考虑 PBC)
-            # get_distances 返回 (D2, D) -> D 是距离矩阵
-            # 这里为了效率，我们可以只检查最近邻，或者用简单的方法
-            # 为了严谨，我们利用 ASE 的 mic (最小镜像约定)
-            
-            # 一个简单的 trick: 如果原子数不多，直接全对全计算
-            # 这里的 algorithm 并不是最高效的，但对于 <100 原子的体系足够快
+            # 获取所有原子对的最小镜像距离矩阵
             dists = atoms.get_all_distances(mic=True)
             
-            # 将对角线(自己到自己)设为无穷大
+            # 排除自身距离
             np.fill_diagonal(dists, np.inf)
             
-            min_d = np.min(dists)
-            
-            if min_d < min_dist:
+            # 核心判断：如果任何原子对距离 < 阈值矩阵对应的元素
+            if np.any(dists < threshold_matrix):
                 self.valid_mask[i] = False
-                self.rejected_reasons.append(f"Frame {i}: Min dist {min_d:.3f} < {min_dist}")
+                self.rejected_reasons.append(f"Frame {i}: Atomic overlap detected (below radii sum factor)")
                 count += 1
                 
         print(f"  -> 发现 {count} 帧存在严重原子重叠。")
         return self
 
-    def check_outliers(self, sigma_n=3.0, max_force_tol=50.0):
+    def check_outliers(self, sigma_n=4.0, max_force_tol=100.0):
         """
         统计检查：剔除能量/力异常的帧
         :param sigma_n: 能量剔除阈值 (平均值 +/- N * 标准差)

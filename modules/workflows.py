@@ -87,8 +87,8 @@ def run_stage_2_collect(mode="scf"):
     # 2. 清洗 (DataQualityControl)
     qc = DataQualityControl(raw_data)
     
-    # 物理合理性检查 (使用硬阈值 0.8 Ang)
-    qc.check_atom_overlap(min_dist=0.8) 
+    # 物理合理性检查 (使用共价半径倍数阈值)
+    qc.check_atom_overlap(threshold_factor=cfg.QC_OVERLAP_THRESHOLD)  
     
     # 统计离群值检查
     qc.check_outliers(sigma_n=cfg.QC_SIGMA_E, max_force_tol=cfg.QC_MAX_FORCE)

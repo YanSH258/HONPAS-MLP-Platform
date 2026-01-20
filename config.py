@@ -35,7 +35,7 @@ NUM_TASKS = 2
 
 # 质量控制配置
 QC_OVERLAP_THRESHOLD = 0.5  # 共价半径之和的倍数
-QC_MAX_FORCE = 30.0         # eV/Ang
+QC_MAX_FORCE = 100         # eV/Ang
 QC_SIGMA_E = 4.0            # Energy Z-score
 
 # 可视化与分析配置
