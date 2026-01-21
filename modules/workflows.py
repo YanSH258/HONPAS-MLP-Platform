@@ -5,17 +5,24 @@ import glob
 import config as cfg  # 导入配置文件
 
 # 导入各个功能模块
-from modules.sampler import StructureSampler
-from modules.wrapper import InputWrapper
-from modules.scheduler import TaskScheduler
-from modules.extractor import ResultExtractor
-from modules.cleaner import DataQualityControl
-from modules.analyzer import SOAPSpaceAnalyzer
-from modules.merger import DatasetMerger
-from modules.converter import NEPConverter
-from modules.trainer import ModelTrainer
-from modules.evaluator import ModelEvaluator
-from modules.monitor import TrainingMonitor
+# --- Generation Modules ---
+from modules.generation.sampler import StructureSampler
+from modules.generation.wrapper import InputWrapper
+from modules.generation.scheduler import TaskScheduler
+
+# --- Data Modules ---
+from modules.data.extractor import ResultExtractor
+from modules.data.cleaner import DataQualityControl
+from modules.data.merger import DatasetMerger
+
+
+# --- Analysis Modules ---
+from modules.analysis.analyzer import SOAPSpaceAnalyzer
+
+# --- Training Modules ---
+from modules.training.trainer import ModelTrainer
+from modules.training.monitor import TrainingMonitor
+from modules.training.evaluator import ModelEvaluator
 
 # ==============================================================================
 # Stage 1: 生成与提交

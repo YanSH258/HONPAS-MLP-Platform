@@ -1,7 +1,7 @@
 import dpdata
 import os
 import numpy as np
-from modules.validator import StructureValidator 
+from modules.data.validator import StructureValidator 
 
 class StructureSampler:
     def __init__(self, file_path):

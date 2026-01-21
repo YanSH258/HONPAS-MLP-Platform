@@ -2,8 +2,7 @@ import os
 import glob
 import dpdata
 import time
-# 关键：导入之前写好的转换器
-from modules.converter import NEPConverter
+from modules.data.converter import NEPConverter
 
 class DatasetMerger:
     @staticmethod

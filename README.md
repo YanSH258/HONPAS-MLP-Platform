@@ -1,4 +1,4 @@
-# HONPAS-MLP Automation Platform 
+# HONPAS-MLP Automation Platform
 
 本项目是一个基于 Python 构建的自动化工作流系统，旨在连接国产材料模拟软件 **HONPAS** 与机器学习势能（DeepMD-kit / GPUMD）训练框架。
 
@@ -38,25 +38,32 @@ pip install matplotlib seaborn dscribe scikit-learn
 
 ## 3. 目录结构
 
+代码经过模块化重构，逻辑更加清晰：
+
 ```text
 HAP_project_v2/
 ├── config.py              # 全局配置 (微扰参数、QC阈值、HONPAS模板路径)
 ├── config_train.py        # 训练配置 (DeepMD/GPUMD 超参数模板)
 ├── main.py                # 主程序入口 (CLI)
-├── modules/               # 功能模块库
-│   ├── sampler.py         # 结构微扰与超胞处理
-│   ├── validator.py       # 几何合理性校验
-│   ├── wrapper.py         # HONPAS 输入文件生成
-│   ├── scheduler.py       # 任务目录管理与 Slurm 提交
-│   ├── extractor.py       # 结果提取 (log解析)
-│   ├── cleaner.py         # 数据清洗 (QC)
-│   ├── converter.py       # 格式转换 (DeepMD -> GPUMD XYZ)
-│   ├── merger.py          # 数据集合并
-│   ├── analyzer.py        # SOAP-PCA 可视化分析
-│   ├── trainer.py         # 训练文件生成与数据拆分
-│   ├── monitor.py         # 训练过程 Loss 监控
-│   ├── evaluator.py       # 模型冻结、压缩与精度评估
-│   └── workflows.py       # 阶段流程封装
+├── modules/               # 核心功能库
+│   ├── workflows.py       # [总控] 阶段流程封装
+│   ├── generation/        # [生成端]
+│   │   ├── sampler.py     # 结构微扰与超胞处理
+│   │   ├── wrapper.py     # HONPAS 输入文件生成
+│   │   └── scheduler.py   # 任务目录管理与提交
+│   ├── data/              # [数据端]
+│   │   ├── extractor.py   # 结果提取
+│   │   ├── cleaner.py     # 数据清洗 (QC)
+│   │   ├── merger.py      # 数据集合并
+│   │   ├── converter.py   # 格式转换
+│   │   └── validator.py   # 几何校验工具
+│   ├── analysis/          # [分析端]
+│   │   ├── analyzer.py    # SOAP-PCA 核心分析
+│   │   └── visualizer.py  # 基础绘图工具
+│   └── training/          # [训练端]
+│       ├── trainer.py     # 训练准备与配置生成
+│       ├── monitor.py     # 训练监控
+│       └── evaluator.py   # 模型评估
 ├── templates/             # 输入模板 (.in) 及 赝势库 (psfs/)
 └── data/                  # 数据流转目录
     ├── perturbed/         # 微扰结构备份
@@ -83,7 +90,6 @@ python main.py --mode relax --stage 1 --submit
 # 3. 分子动力学任务 (AIMD)
 python main.py --mode aimd --stage 1 --submit
 ```
-*注：`config.py` 中可配置超胞尺寸 `SUPERCELL_SIZE`。*
 
 ### Stage 2: 收集与清洗 (Collect & Clean)
 等待任务完成后，提取结果并进行质量控制。
@@ -91,8 +97,7 @@ python main.py --mode aimd --stage 1 --submit
 ```bash
 python main.py --mode relax --stage 2
 ```
-*   **输出**：`data/training/set_relax_时间戳/`
-*   **包含**：DeepMD 格式 (`set.000/*.npy`) 和 GPUMD 格式 (`train.xyz`)。
+*   **输出**：`data/training/set_relax_时间戳/` (包含 npy 和 xyz)。
 
 ### Stage 3: 可视化分析 (Analyze)
 计算数据集的全局 SOAP 描述符并进行 PCA 降维，评估相空间覆盖度。
@@ -100,7 +105,6 @@ python main.py --mode relax --stage 2
 ```bash
 python main.py --mode relax --stage 3
 ```
-*   **输出**：`data/analysis/report_relax/soap_pca.png` (能量-描述符分布图)。
 
 ### Stage 4: 数据集合并 (Merge)
 将分散的多个数据集（如不同温度的 AIMD、Relax 数据）合并为一个主数据集。
@@ -108,54 +112,32 @@ python main.py --mode relax --stage 3
 ```bash
 python main.py --stage 4
 ```
-*   程序会自动扫描 `data/training/` 下的所有数据集。
-*   **输出**：`data/training/merged_master_时间戳/` (包含合并后的 npy 和 xyz)。
 
 ### Stage 5: 训练准备 (Train Preparation)
 生成模型训练所需的配置文件和数据目录。
 
-#### 模式 A: 准备 DeepMD 训练
 ```bash
-# 指定合并后的数据集，按 8:2 拆分
+# 准备 DeepMD 训练 (自动拆分训练/验证集)
 python main.py --stage 5 --model_type deepmd --data_path data/training/merged_master_xxx --val_ratio 0.2
-```
-*   **执行动作**：在当前目录创建 `train_work_deepmd_xxx`，物理拆分数据并生成 `input.json`。
-*   **后续操作**：进入目录执行 `dp train input.json`。
 
-#### 模式 B: 准备 GPUMD (NEP) 训练
-```bash
+# 准备 GPUMD 训练
 python main.py --stage 5 --model_type gpumd --data_path data/training/merged_master_xxx
 ```
-*   **执行动作**：在当前目录创建 `train_work_gpumd_xxx`，生成 `train.xyz`, `test.xyz` 和 `nep.in`。
-*   **后续操作**：进入目录执行 `nep`。
 
 ### Stage 6: 训练监控 (Monitor)
 在模型训练过程中，实时查看 Loss 收敛曲线。
 
 ```bash
 python main.py --stage 6 --model_type deepmd
-# 或
-python main.py --stage 6 --model_type gpumd
 ```
-*   程序会自动寻找最新的训练目录。
-*   **输出**：`monitor_lcurve.png` (DeepMD) 或 `monitor_loss.png` (GPUMD)。
 
 ### Stage 7: 模型评估 (Evaluate)
 训练完成后，对模型进行冻结、压缩，并评估其精度（RMSE）。
 
-#### DeepMD 评估
 ```bash
+# DeepMD 评估 (自动调用 dp test 并绘图)
 python main.py --stage 7 --model_type deepmd
 ```
-*   **执行动作**：`dp freeze` -> `dp compress` -> `dp test`。
-*   **输出**：`deepmd_results.png` (能量/受力 Parity Plot)。
-
-#### GPUMD 评估
-```bash
-python main.py --stage 7 --model_type gpumd
-```
-*   **执行动作**：解析 `energy_train.out`, `force_train.out` 等。
-*   **输出**：`eval_report_gpumd.png` (包含 Loss, Energy, Force, Virial 四合一图)。
 
 ---
 
@@ -171,25 +153,45 @@ python main.py --stage 7 --model_type gpumd
 
 ---
 
-### 6. 模块功能详解
+## 6. 模块功能详解
 
-平台的业务逻辑高度模块化，各组件职责如下表所示：
+平台的业务逻辑按功能域进行了划分：
 
-| 模块名称 | 核心职责说明 |
+### 🧬 生成端 (`modules/generation`)
+| 模块 | 职责 |
 | :--- | :--- |
-| **sampler.py** | **结构生成器**：基于 `dpdata` 实现基态结构的超胞扩充与随机微扰 。 |
-| **validator.py** | **物理预筛选**：基于共价半径检测原子重叠，在提交计算前拦截不合理的构型，节省算力。 |
-| **wrapper.py** | **模板引擎**：将结构数据注入 HONPAS 模板 (.fdf)，自动映射元素并关联对应的 PSF 赝势文件。 |
-| **scheduler.py** | **任务调度**：自动化管理任务目录、分发赝势、生成 Slurm 脚本 (`run.sh`) 并批量提交作业。 |
-| **extractor.py** | **结果采集**：支持 SCF/Relax/AIMD 模式，解析 `output.log` 提取能量、力、维里及坐标信息。 |
-| **cleaner.py** | **质量控制 (QC)**：执行后处理清洗，利用 Z-score 和最大受力阈值自动剔除离群数据 (Outliers)。 |
-| **converter.py** | **格式转换**：实现 DeepMD (`.npy`) 与 GPUMD (`.xyz`) 格式互转，自动修正 HONPAS 维里符号差异。 |
-| **merger.py** | **数据聚合**：支持将多个分散的数据集（如不同温度/批次）无损合并为统一的主数据集。 |
-| **analyzer.py** | **特征分析**：计算全局 SOAP 描述符并执行 PCA 降维，可视化评估数据集对势能面的覆盖度。 |
-| **trainer.py** | **训练准备**：自动划分训练集/验证集，生成 DeepMD (`input.json`) 或 GPUMD (`nep.in`) 配置文件。 |
-| **monitor.py** | **训练监控**：实时读取 `lcurve.out` 或 `loss.out`，绘制 Loss 收敛曲线，辅助判断训练状态。 |
-| **evaluator.py** | **模型评估**：执行模型冻结、压缩，调用 `dp test` 或解析 NEP 输出，绘制预测值 vs 真值的 Parity Plot。 |
-| **workflows.py** | **流程编排**：作为顶层逻辑控制器，串联各独立模块，定义 Stage 1~7 的标准化操作流程。 |
+| **sampler.py** | **结构生成器**：基于 `dpdata` 实现基态结构的超胞扩充与随机微扰。 |
+| **wrapper.py** | **模板引擎**：将结构数据注入 HONPAS 模板，自动映射元素。 |
+| **scheduler.py** | **任务调度**：管理任务目录、分发赝势、生成 `run.sh` 并提交作业。 |
+
+### 💾 数据端 (`modules/data`)
+| 模块 | 职责 |
+| :--- | :--- |
+| **extractor.py** | **结果采集**：解析 `output.log` 提取能量、力、维里及坐标。 |
+| **cleaner.py** | **质量控制**：执行后处理清洗，剔除能量与受力的离群数据。 |
+| **validator.py** | **物理预筛选**：基于共价半径检测原子重叠，拦截不合理构型。 |
+| **converter.py** | **格式转换**：实现 DeepMD/GPUMD 格式互转，修正维里符号。 |
+| **merger.py** | **数据聚合**：支持将多个分散的数据集无损合并。 |
+
+### 📊 分析端 (`modules/analysis`)
+| 模块 | 职责 |
+| :--- | :--- |
+| **analyzer.py** | **特征分析**：计算 SOAP 描述符并执行 PCA 降维。 |
+| **visualizer.py** | **绘图组件**：提供基础统计图表支持。 |
+
+### 🚀 训练端 (`modules/training`)
+| 模块 | 职责 |
+| :--- | :--- |
+| **trainer.py** | **训练准备**：数据拆分、生成配置文件 (`input.json`/`nep.in`)。 |
+| **monitor.py** | **训练监控**：解析日志并绘制 Loss 曲线。 |
+| **evaluator.py** | **模型评估**：模型冻结压缩、测试推理及 Parity Plot 绘制。 |
+
+### 🔗 核心控制
+| 模块 | 职责 |
+| :--- | :--- |
+| **workflows.py** | **流程编排**：串联各子模块，定义 Stage 1~7 的标准化逻辑。 |
+
+---
 
 ### 7. 注意事项 (Notes)
 

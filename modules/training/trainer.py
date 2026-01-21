@@ -7,7 +7,7 @@ import numpy as np
 import dpdata
 import config as cfg
 import config_train as cfg_tr
-from modules.converter import NEPConverter
+from modules.data.converter import NEPConverter
 
 class ModelTrainer:
     def __init__(self, work_dir):
