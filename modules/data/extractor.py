@@ -1,60 +1,61 @@
-# HAP_MLP_Project/modules/extractor.py
 import os
 import glob
 import dpdata
+import numpy as np
 
 class ResultExtractor:
     def __init__(self, workspace_root):
         self.workspace_root = workspace_root
 
-    def collect_data(self, mode="scf"): # 增加 mode 参数，默认为 scf
+    def collect_data(self, mode="scf"):
         """
-        遍历目录，读取 output.log，合并为一个 LabeledSystem
+        遍历目录，提取数据，并按原子数量/配比分组
+        返回: dict { tuple(atom_numbs): dpdata.LabeledSystem, ... }
         """
-        # 根据 mode 决定 dpdata 的解析格式
-        # SCF 模式用 siesta/output, AIMD 模式用 siesta/aimd_output
-        data_fmt = 'siesta/aimd_output' if mode.lower() == 'aimd' else 'siesta/output'
-        
-        print(f"[Extractor] 当前模式: {mode.upper()}, 使用格式: {data_fmt}")
+        # 1. 确定格式
+        fmt = "siesta/aimd_output" if mode == "aimd" else "siesta/output"
+        print(f"[Extractor] 当前模式: {mode.upper()}, 使用格式: {fmt}")
 
-        # 1. 找到所有 output.log
+        # 2. 找到文件
         search_pattern = os.path.join(self.workspace_root, "task_*", "output.log")
         files = sorted(glob.glob(search_pattern))
         
         print(f"[Extractor] 在 {self.workspace_root} 中找到 {len(files)} 个输出文件。")
         
-        valid_systems = []
-        
-        # 2. 逐个读取
+        # 3. 分组容器
+        grouped_systems = {} 
+
         for f in files:
             try:
-                # 使用动态确定的 data_fmt
-                # 注意：siesta/aimd_output 要求 output.log 旁边必须有 .ANI 或 .FA 文件
-                ls = dpdata.LabeledSystem(f, fmt=data_fmt)
-                
+                # 读取单个任务
+                ls = dpdata.LabeledSystem(f, fmt=fmt)
                 if len(ls) > 0:
-                    valid_systems.append(ls)
-                    # 如果是 AIMD 模式，打印一下每个任务抓到了多少帧
-                    if mode.lower() == 'aimd':
-                        print(f"  [OK] 任务 {os.path.basename(os.path.dirname(f))} 提取到 {len(ls)} 帧数据")
-                else:
-                    print(f"  [Warn] 文件为空或无帧数据: {f}")
+                    # 获取该系统的特征键 (原子数量列表)
+                    # 例如: [10, 6, 2, 26] -> tuple (不可变，可做字典key)
+                    atom_counts = tuple(ls['atom_numbs'])
                     
+                    if atom_counts not in grouped_systems:
+                        grouped_systems[atom_counts] = ls
+                    else:
+                        grouped_systems[atom_counts].append(ls)
+                    
+                    # print(f"  [OK] 任务 {os.path.basename(os.path.dirname(f))} 提取到 {len(ls)} 帧")
             except Exception as e:
-                print(f"  [Error] 解析失败 {f}: {e}")
+                # print(f"  [Error] 解析失败 {f}: {e}")
+                pass
 
-        if not valid_systems:
+        if not grouped_systems:
             print("[Extractor] 没有收集到任何有效数据！")
             return None
 
-        # 3. 合并数据
-        print(f"[Extractor] 正在合并 {len(valid_systems)} 个系统的结果...")
-        merged_system = valid_systems[0]
-        for s in valid_systems[1:]:
-            try:
-                merged_system.append(s)
-            except Exception as e:
-                print(f"  [Error] 合并时出错 (可能是原子数量/类型不一致): {e}")
+        # 4. 汇报分组情况
+        print(f"[Extractor] 数据提取完成，共发现 {len(grouped_systems)} 种不同的体系结构:")
+        for key, sys in grouped_systems.items():
+            # --- 修复点：手动拼接化学式 ---
+            names = sys['atom_names'] # e.g. ['Ca', 'P', 'O', 'H']
+            numbs = sys['atom_numbs'] # e.g. [10, 6, 26, 2]
+            formula = "".join([f"{n}{c}" for n, c in zip(names, numbs)])
+            
+            print(f"  - 体系 {formula} (原子数 {sum(key)}): 共 {len(sys)} 帧")
 
-        print(f"[Extractor] 合并完成！总帧数: {len(merged_system)}")
-        return merged_system
+        return grouped_systems

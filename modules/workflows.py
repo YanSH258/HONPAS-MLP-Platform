@@ -88,45 +88,60 @@ def run_stage_2_collect(mode="scf"):
         print(f"❌ 目录不存在: {current_workspace}")
         return
 
-    # 1. 提取
+    # 1. 提取 (返回字典: {atom_counts: system})
     extractor = ResultExtractor(current_workspace)
-    raw_data = extractor.collect_data(mode=mode)
+    grouped_data = extractor.collect_data(mode=mode)
     
-    if not raw_data:
+    if not grouped_data:
         print("❌ 无有效数据。")
         return
 
-    # 2. 清洗 (DataQualityControl)
-    qc = DataQualityControl(raw_data)
-    
-    # 物理合理性检查 (使用共价半径倍数阈值)
-    qc.check_atom_overlap(threshold_factor=cfg.QC_OVERLAP_THRESHOLD)  
-    
-    # 统计离群值检查
-    qc.check_outliers(sigma_n=cfg.QC_SIGMA_E, max_force_tol=cfg.QC_MAX_FORCE)
-    
-    # 3. 导出
+    # 准备 GPUMD 的总输出文件 (放在 data/training/gpumd_merged_xyz 目录下，或者跟第一个set放一起)
+    # 为了方便管理，我们把总的 train.xyz 放在一个独立的汇总目录
     timestamp = time.strftime("%Y%m%d_%H%M%S")
-    output_path = f"data/training/set_{mode}_{timestamp}"
+    global_xyz_dir = f"data/training/gpumd_xyz_{mode}_{timestamp}"
+    if not os.path.exists(global_xyz_dir): os.makedirs(global_xyz_dir)
+    global_xyz_path = os.path.join(global_xyz_dir, "train.xyz")
     
-    final_data = qc.generate_report(output_path)
-    
-    if final_data:
-        # 1. 保存 DeepMD 格式 (npy)
-        final_data.to("deepmd/npy", output_path)
-        final_data.to("deepmd/raw", output_path)
-        print(f"✅ DeepMD 数据集已保存: {output_path} (帧数: {len(final_data)})")
-        
-        # 2. 保存 GPUMD 格式 (train.xyz)
-        xyz_filename = os.path.join(output_path, "train.xyz")
-        try:
-            NEPConverter.save_as_xyz(final_data, xyz_filename)
-            print(f"✅ GPUMD 数据集已生成: {xyz_filename}")
-        except Exception as e:
-            print(f"⚠️ GPUMD 格式转换失败: {e}")
-            import traceback
-            traceback.print_exc()
+    # 清空/新建 train.xyz
+    open(global_xyz_path, 'w').close() 
+    print(f"[Workflow] GPUMD 汇总文件路径: {global_xyz_path}")
 
+    # 2. 遍历每组不同原子数的数据
+    for atom_counts, raw_sys in grouped_data.items():
+        n_atoms = sum(atom_counts)
+        print(f"\n>> 处理分组: 原子数 {n_atoms}, 帧数 {len(raw_sys)}")
+        
+        # --- 清洗 ---
+        qc = DataQualityControl(raw_sys)
+        qc.check_atom_overlap(threshold_factor=cfg.QC_OVERLAP_THRESHOLD)
+        qc.check_outliers(sigma_n=cfg.QC_SIGMA_E, max_force_tol=cfg.QC_MAX_FORCE)
+        
+        # 定义 DeepMD 输出目录 (加上原子数后缀以区分)
+        # 例如: set_aimd_2026..._N352
+        output_path = f"data/training/set_{mode}_{timestamp}_N{n_atoms}"
+        
+        # 生成报告并获取清洗后的数据
+        final_data = qc.generate_report(output_path)
+        
+        if final_data and len(final_data) > 0:
+            # (A) 保存 DeepMD 格式 (必须分开存)
+            final_data.to("deepmd/npy", output_path)
+            final_data.to("deepmd/raw", output_path)
+            print(f"   ✅ DeepMD set 保存至: {output_path}")
+            
+            # (B) 追加到 GPUMD train.xyz (合并存)
+            try:
+                NEPConverter.save_as_xyz(final_data, global_xyz_path, mode='a')
+            except Exception as e:
+                print(f"   ⚠️ 追加 train.xyz 失败: {e}")
+        else:
+            print(f"   ⚠️ 分组 N={n_atoms} 清洗后无剩余数据，跳过。")
+
+    print(f"\n✅ Stage 2 完成！")
+    print(f"   - DeepMD 数据: 分散在 data/training/set_{mode}_{timestamp}_N*")
+    print(f"   - GPUMD 数据: 汇总在 {global_xyz_path}")
+    
 # ==============================================================================
 # Stage 3: 可视化分析
 # ==============================================================================
