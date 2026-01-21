@@ -12,6 +12,7 @@ from modules.extractor import ResultExtractor
 from modules.cleaner import DataQualityControl
 from modules.analyzer import SOAPSpaceAnalyzer
 from modules.merger import DatasetMerger
+from modules.converter import NEPConverter
 
 # ==============================================================================
 # Stage 1: 生成与提交
@@ -101,10 +102,20 @@ def run_stage_2_collect(mode="scf"):
     final_data = qc.generate_report(output_path)
     
     if final_data:
+        # 1. 保存 DeepMD 格式 (npy)
         final_data.to("deepmd/npy", output_path)
         final_data.to("deepmd/raw", output_path)
-        print(f"✅ 最终数据集: {output_path} (帧数: {len(final_data)})")
-
+        print(f"✅ DeepMD 数据集已保存: {output_path} (帧数: {len(final_data)})")
+        
+        # 2. 保存 GPUMD 格式 (train.xyz)
+        xyz_filename = os.path.join(output_path, "train.xyz")
+        try:
+            NEPConverter.save_as_xyz(final_data, xyz_filename)
+            print(f"✅ GPUMD 数据集已生成: {xyz_filename}")
+        except Exception as e:
+            print(f"⚠️ GPUMD 格式转换失败: {e}")
+            import traceback
+            traceback.print_exc()
 
 # ==============================================================================
 # Stage 3: 可视化分析
