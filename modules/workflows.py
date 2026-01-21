@@ -14,7 +14,7 @@ from modules.generation.scheduler import TaskScheduler
 from modules.data.extractor import ResultExtractor
 from modules.data.cleaner import DataQualityControl
 from modules.data.merger import DatasetMerger
-
+from modules.data.converter import NEPConverter
 
 # --- Analysis Modules ---
 from modules.analysis.analyzer import SOAPSpaceAnalyzer
