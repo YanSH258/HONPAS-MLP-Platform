@@ -1,4 +1,4 @@
-# HAP-MLP Automation Platform (V2)
+# HONPAS-MLP-Platform
 
 本项目是一个基于 Python 构建的自动化工作流系统，旨在连接国产材料模拟软件 **HONPAS** 与机器学习势能（DeepMD-kit / GPUMD）训练框架。
 
