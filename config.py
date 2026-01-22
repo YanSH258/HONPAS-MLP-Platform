@@ -30,15 +30,15 @@ PERTURB_CONFIG = {
     "atom_pert_style": "normal"
 }
 
-# 任务数量
-NUM_TASKS = 2
+# stage1 任务数量
+NUM_TASKS = 20
 
 # 质量控制配置
 QC_OVERLAP_THRESHOLD = 0.5  # 共价半径之和的倍数
 QC_MAX_FORCE = 100         # eV/Ang
 QC_SIGMA_E = 4.0            # Energy Z-score
 
-# 可视化与分析配置
+# stage3 可视化与分析配置
 VIS_CONFIG = {
     "soap_rcut": 6.0,    # 截断半径 
     "soap_nmax": 8,      # 径向基函数数量
