@@ -296,7 +296,7 @@ def run_stage_7_eval(model_type="deepmd", work_dir=None):
 # ==============================================================================
 # Stage 8: 主动学习 (active) 
 # ==============================================================================
-def run_stage_8_al_gpumd(sub_stage, data_path=None, work_dir=None):
+def run_stage_8_al_gpumd(sub_stage, data_path=None, work_dir=None,  dry_run=True):
     print(f"\n=== Stage 8: GPUMD 主动学习 (Sub-Stage: 8.{sub_stage}) ===")
 
     # 8.1 准备系综训练目录
@@ -332,11 +332,47 @@ def run_stage_8_al_gpumd(sub_stage, data_path=None, work_dir=None):
         explorer.prepare_exploration(model_dirs, data_path)
         print(f"\n✅ 探索目录已生成: {explore_dir}")
 
-    # 8.3 筛选结构 (后续测试)
+    # ------------------------------------------------------------------
+    # 8.3 收集 active.xyz -> 保存 npy -> 生成 HONPAS 任务
+    # ------------------------------------------------------------------
     elif sub_stage == 3:
         if not work_dir:
-            print("❌ 错误: 请使用 --path 指定 Stage 8.2 的探索目录")
+            print("❌ 错误: 请使用 --path 指定探索目录 (al_gpumd_explore_xxx)")
             return
+
+        # 1. 筛选并备份 (npy)
         selector = ActiveSelector(work_dir)
-        candidates = selector.select_candidates()
-        # 这里可以继续调用 Stage 1 的逻辑生成 HONPAS 任务
+        timestamp = time.strftime("%Y%m%d_%H%M%S")
+        backup_name = f"al_candidates_{timestamp}"
+        
+        candidates_sys = selector.select_and_save(backup_name)
+
+        if not candidates_sys:
+            return
+
+        # 2. 构建 HONPAS 计算任务 (标注)
+        # 我们可以单独建立一个 workspace 以便区分
+        dft_workspace = f"workspace_al_dft_{timestamp}"
+        
+        from modules.generation.wrapper import InputWrapper
+        from modules.generation.scheduler import TaskScheduler
+        
+        # 使用 SCF 模式进行标注
+        template_path = cfg.TEMPLATE_MAP["scf"]
+        wrapper = InputWrapper(template_path, cfg.SPECIES_MAP)
+        scheduler = TaskScheduler(dft_workspace, submit_cmd="sbatch")
+
+        print(f"[Workflow] 正在生成 HONPAS 标注任务至: {dft_workspace} ...")
+        
+        count = 0
+        for i in range(len(candidates_sys)):
+            frame_data = candidates_sys[i].data
+            # 自动复制赝势
+            scheduler.setup_task(i, wrapper, frame_data, psf_dir=cfg.TEMPLATE_DIR)
+            count += 1
+            
+        print(f"✅ 任务构建完成，共 {count} 个。")
+        
+        # 3. 提交
+        # 根据命令行参数决定是否真实提交
+        scheduler.submit_all(dry_run=dry_run)

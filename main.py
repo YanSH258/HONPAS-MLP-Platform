@@ -8,7 +8,8 @@ from modules.workflows import (
     run_stage_4_merge,
     run_stage_5_train,
     run_stage_6_monitor, 
-    run_stage_7_eval     
+    run_stage_7_eval,   
+    run_stage_8_al_gpumd 
 )
 
 if __name__ == "__main__":
@@ -86,5 +87,6 @@ if __name__ == "__main__":
         run_stage_8_al_gpumd(
             sub_stage=args.sub,
             data_path=args.data_path,
-            work_dir=args.path
+            work_dir=args.path,
+            dry_run=not args.submit
         )
