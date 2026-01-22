@@ -20,8 +20,9 @@ if __name__ == "__main__":
                         help="[Stage 1-3] 计算模式 (scf/relax/aimd)")
     
     parser.add_argument("--stage", type=int, default=1, 
-                        choices=[1, 2, 3, 4, 5, 6, 7], 
-                        help="阶段: 1=生成提交, 2=收集清洗, 3=数据分析, 4=数据合并, 5=训练准备, 6=训练监控, 7=模型评估")
+                        choices=[1, 2, 3, 4, 5, 6, 7, 8], 
+                        help="阶段: 1=生成提交, 2=收集清洗, 3=数据分析, 4=数据合并, " \
+                        "5=训练准备, 6=训练监控, 7=模型评估, 8=主动学习" )
     
     parser.add_argument("--submit", action="store_true", 
                         help="[Stage 1] 是否真实提交作业 (不加则为Dry Run)")
@@ -40,7 +41,9 @@ if __name__ == "__main__":
 
     parser.add_argument("--val_ratio", type=float, default=0.2,
                         help="[Stage 5] 验证集划分比例")
-
+    
+    parser.add_argument("--sub", type=int, default=1, help="Stage 8 子阶段")
+    
     args = parser.parse_args()
 
     # ================= 逻辑调度 =================
@@ -75,5 +78,13 @@ if __name__ == "__main__":
         # 模型评估 (Freeze/Compress/Test/ParityPlot)
         run_stage_7_eval(
             model_type=args.model_type, 
+            work_dir=args.path
+        )
+
+    elif args.stage == 8:
+        from modules.workflows import run_stage_8_al_gpumd
+        run_stage_8_al_gpumd(
+            sub_stage=args.sub,
+            data_path=args.data_path,
             work_dir=args.path
         )

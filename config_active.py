@@ -1,42 +1,44 @@
 # config_active.py
 
 # ==============================================================================
-# GPUMD 主动学习 (Active Learning) 参数配置
+# GPUMD 主动学习 (Active Learning) 
 # ==============================================================================
 
-# 1. 系综训练设置
-# 训练多少个 NEP 模型用于误差评估
-N_ENSEMBLE = 4
-
-# 2. MD 探索参数 (控制 run.in)
+# 1. 基础 MD 设置
 EXPLORE_CONFIG = {
-    "time_step": 1.0,          # 时间步长 (fs)
-    "steps": 100000,           # MD 总步数
+    "time_step": 1.0,          # fs
+    "steps": 10000,            # 探索步数
+    "velocity_temp": 300,      # 初始速度对应温度
+    "dump_thermo": 100,        # 热力学输出间隔
+    "dump_xyz_interval": 1000, # 轨迹输出间隔
+    "dump_xyz_properties": ["velocity", "force"] 
+}
+
+# 2. 系综配置 (Ensemble)
+# 默认使用 nvt_ber，支持切换到 npt_mttk
+ENSEMBLE_CONFIG = {
+    "method": "nvt_ber",       # 默认 NVT
     
-    # 温度设置 (可以是单个值，也可以是列表用于多轮迭代)
-    # 如果是列表，Workflow 需要逻辑去轮询，这里暂定为单次运行的温度
-    "temperature": 300,        
+    # --- 温度参数 ---
+    "T_start": 300,
+    "T_end": 300,
+    "T_coupling": 100,         # 对于 mttk 对应 tperiod
     
-    # 系综设置: 'nvt_ber', 'npt_berendsen', 'nve' 等
-    # 格式: "ensemble_keyword parameters"
-    # 例如 NVT: "nvt_ber 300 300 100" (T_start, T_end, Tau)
-    # 例如 NPT: "npt_scr 300 300 100 0 0 0 100 100 100 1000" 
-    "ensemble_str": "nvt_bdp 300 300 100",
-    
-    # 初始速度
-    "velocity_temp": 300       # 初始速度对应的温度
+    # --- 压力参数 (仅 npt_mttk 需要) ---
+    "p_direction": "iso",      # iso, aniso, tri, x, y, z...
+    "p_start": 0.0,            # P1 (GPa)
+    "p_end": 0.0,              # P2 (GPa)
+    "p_coupling": 1000         # pperiod
 }
 
 # 3. 主动学习筛选策略 (active 关键字)
 ACTIVE_STRATEGY = {
-    "interval": 10,            # 每多少步检查一次
-    "has_velocity":0,         # 不输出速度
-    "has_force":0,            # 不输出力
-    "has_uncertainty"         #输出不确定度
-    "threshold": 0.05,         # 力误差阈值 (eV/A), 超过此值保存结构
+    "interval": 10,            # 每 10 步检查一次
+    "threshold": 0.05,         # 力误差阈值 (eV/A)
+    "has_velocity": 0,
+    "has_force": 0,
+    "has_uncertainty": 1
 }
 
-# 4. 采样限制
-# 从 active.xyz 中最多挑选多少个结构送去算 DFT
-# 避免一次性生成太多任务把集群算爆
+N_ENSEMBLE = 4
 MAX_SELECTION = 100

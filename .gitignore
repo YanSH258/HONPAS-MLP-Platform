@@ -10,6 +10,7 @@ data/perturbed/
 data/training/
 workspace_*/
 train_work*
+al_gpumd_*
 
 # --- 忽略特定后缀的大文件 ---
 *.npy

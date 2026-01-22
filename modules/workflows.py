@@ -24,6 +24,11 @@ from modules.training.trainer import ModelTrainer
 from modules.training.monitor import TrainingMonitor
 from modules.training.evaluator import ModelEvaluator
 
+# --- Active_learning Moudules
+from modules.active_learning.trainer import ALTrainer
+from modules.active_learning.explorer import ALExplorer
+from modules.active_learning.selector import ActiveSelector
+
 # ==============================================================================
 # Stage 1: 生成与提交
 # ==============================================================================
@@ -287,3 +292,51 @@ def run_stage_7_eval(model_type="deepmd", work_dir=None):
         evaluator.eval_deepmd()
     elif model_type == "gpumd":
         evaluator.eval_gpumd()
+
+# ==============================================================================
+# Stage 8: 主动学习 (active) 
+# ==============================================================================
+def run_stage_8_al_gpumd(sub_stage, data_path=None, work_dir=None):
+    print(f"\n=== Stage 8: GPUMD 主动学习 (Sub-Stage: 8.{sub_stage}) ===")
+
+    # 8.1 准备系综训练目录
+    if sub_stage == 1:
+        if not data_path:
+            print("❌ 错误: 请使用 --data_path 指定合并后的训练集目录 (含 train.xyz)")
+            return
+            
+        timestamp = time.strftime("%Y%m%d_%H%M%S")
+        train_dir = f"al_gpumd_train_{timestamp}"
+        
+        trainer = ALTrainer(train_dir)
+        trainer.prepare_ensemble(data_path)
+        print(f"\n✅ 系综训练目录已生成: {train_dir}")
+        print(f"   下一步: 在 model_xx 目录下运行 nep 训练出 nep.txt。")
+
+    # 8.2 准备探索任务 (MD)
+    elif sub_stage == 2:
+        if not work_dir:
+            print("❌ 错误: 请使用 --path 指定 Stage 8.1 生成的训练根目录")
+            return
+        if not data_path:
+            print("❌ 错误: 请使用 --data_path 指定 MD 的初始结构文件 (如 model.xyz)")
+            return
+
+        # 查找包含 nep.txt 的子目录
+        model_dirs = sorted(glob.glob(os.path.join(work_dir, "model_*")))
+        
+        timestamp = time.strftime("%Y%m%d_%H%M%S")
+        explore_dir = f"al_gpumd_explore_{timestamp}"
+        
+        explorer = ALExplorer(explore_dir)
+        explorer.prepare_exploration(model_dirs, data_path)
+        print(f"\n✅ 探索目录已生成: {explore_dir}")
+
+    # 8.3 筛选结构 (后续测试)
+    elif sub_stage == 3:
+        if not work_dir:
+            print("❌ 错误: 请使用 --path 指定 Stage 8.2 的探索目录")
+            return
+        selector = ActiveSelector(work_dir)
+        candidates = selector.select_candidates()
+        # 这里可以继续调用 Stage 1 的逻辑生成 HONPAS 任务

@@ -1,45 +1,28 @@
 import os
 import shutil
-import glob
 import config_active as cfg_al
 
 class ALExplorer:
-    """
-    主动学习探索模块 (仅 GPUMD)
-    负责生成带有 active 关键字的 run.in，并链接系综势函数。
-    """
     def __init__(self, work_dir):
         self.work_dir = work_dir
         if not os.path.exists(self.work_dir):
             os.makedirs(self.work_dir)
 
     def prepare_exploration(self, trained_model_dirs, init_structure_path):
-        """
-        :param trained_model_dirs: 包含 nep.txt 的模型目录列表
-        :param init_structure_path: 用户的初始结构文件 (model.xyz)
-        """
-        print(f"[AL-Explorer] 正在构建探索任务...")
+        """生成探索任务文件夹"""
+        print(f"[AL-Explorer] 正在构建探索任务目录: {self.work_dir}")
         
         # 1. 链接势函数 (nep0.txt, nep1.txt ...)
         linked_models = self._link_potentials(trained_model_dirs)
-        if len(linked_models) < 2:
-            print("❌ 错误: 有效模型少于 2 个，无法进行系综不确定度计算。")
-            return
-
-        # 2. 准备初始结构 (model.xyz)
-        if not os.path.exists(init_structure_path):
-            raise FileNotFoundError(f"初始结构不存在: {init_structure_path}")
         
-        # 复制到工作目录
+        # 2. 准备初始结构 (model.xyz)
         target_model = os.path.join(self.work_dir, "model.xyz")
+        if os.path.exists(target_model): os.remove(target_model)
         shutil.copy(init_structure_path, target_model)
-        print(f"  -> 初始结构已就位: {os.path.basename(init_structure_path)}")
 
         # 3. 生成 run.in
         self._write_run_in(linked_models)
-        
-        print(f"✅ 探索目录构建完成: {self.work_dir}")
-        print(f"   请运行 'nep' (GPUMD) 开始探索。")
+        print(f"✅ 探索配置已生成。")
 
     def _link_potentials(self, model_dirs):
         linked = []
@@ -53,33 +36,54 @@ class ALExplorer:
                 os.symlink(os.path.abspath(src), dst_path)
                 linked.append(dst_name)
                 count += 1
-            else:
-                print(f"⚠️ 警告: {md} 下未找到 nep.txt")
         return linked
 
+    def _build_ensemble_line(self):
+        """组装系综指令"""
+        ec = cfg_al.ENSEMBLE_CONFIG
+        method = ec['method']
+        
+        if method == "nvt_ber":
+            return f"ensemble nvt_ber {ec['T_start']} {ec['T_end']} {ec['T_coupling']}"
+        
+        if method == "npt_mttk":
+            return (f"ensemble npt_mttk temp {ec['T_start']} {ec['T_end']} "
+                    f"{ec['p_direction']} {ec['p_start']} {ec['p_end']} "
+                    f"tperiod {ec['T_coupling']} pperiod {ec['p_coupling']}")
+        return f"ensemble {method}"
+
     def _write_run_in(self, models):
-        conf = cfg_al.EXPLORE_CONFIG
+        md = cfg_al.EXPLORE_CONFIG
         act = cfg_al.ACTIVE_STRATEGY
         
         run_file = os.path.join(self.work_dir, "run.in")
         with open(run_file, 'w') as f:
-            # --- Potentials ---
+            # 1. Potential
             for m in models:
                 f.write(f"potential {m}\n")
             f.write("\n")
             
-            # --- MD Settings (from config_active) ---
-            f.write(f"velocity {conf['velocity_temp']}\n")
-            f.write(f"time_step {conf['time_step']}\n")
-            f.write(f"ensemble {conf['ensemble_str']}\n")
+            # 2. Basic MD
+            f.write(f"time_step {md['time_step']}\n")
+            f.write(f"velocity {md['velocity_temp']}\n")
             
-            # --- Active Learning Strategy ---
-            # active <interval> <v> <f> <u> <thresh>
-            # 这里的 0 0 代表不保存速度和力到 active.xyz，只保存结构
-            cmd = f"active {act['interval']} 0 0 {act['has_uncertainty']} {act['threshold']}"
-            f.write(f"{cmd}\n")
+            # 3. Ensemble
+            f.write(f"{self._build_ensemble_line()}\n")
+            f.write("\n")
             
-            # --- Run ---
-            # 输出轨迹供参考
-            f.write(f"dump_exyz 1000 trajectory.xyz\n")
-            f.write(f"run {conf['steps']}\n")
+            # 4. Active Learning
+            # active <interval> <has_v> <has_f> <has_u> <threshold>
+            f.write(f"active {act['interval']} {act['has_velocity']} {act['has_force']} {act['has_uncertainty']} {act['threshold']}\n")
+            f.write("\n")
+            
+            # 5. Output Control
+            f.write(f"dump_thermo {md['dump_thermo']}\n")
+            
+            # --- 修正后的 dump_xyz 语法 ---
+            # 语法: dump_xyz <grouping_method> <group_id> <interval> <filename> {properties}
+            # -1 1 代表全系统输出
+            interval = md['dump_xyz_interval']
+            props = " ".join(md.get('dump_xyz_properties', []))
+            f.write(f"dump_xyz -1 1 {interval} dump.xyz {props}\n")
+            
+            f.write(f"run {md['steps']}\n")
