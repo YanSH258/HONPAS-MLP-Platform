@@ -167,6 +167,7 @@ python main.py --stage 8 --sub 2 --path al_gpumd_train_xxx --data_path data/raw/
 ```bash
 # --path 指向上步生成的训练根目录，--path 指向active.xyz
 python main.py --stage 8 --sub 3 --path al_gpumd_explore_xxx 
+```
 ---
 
 
