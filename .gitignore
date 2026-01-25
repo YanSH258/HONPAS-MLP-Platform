@@ -1,0 +1,43 @@
+# --- Python 缓存 ---
+__pycache__/
+*.pyc
+
+# --- 核心逻辑：保留目录结构，忽略内部所有文件，除了 .gitkeep ---
+
+# 1. 忽略这些目录下及其所有子目录下的所有文件
+workspace*/**
+iter_*/**
+al_gpumd*/**
+train_work*/**
+slurm_logs/**
+data/training/**
+data/perturbed/**
+data/analysis/**
+
+# 2. 强制放行所有目录下的 .gitkeep 文件（无论多深）
+!**/.gitkeep
+
+# --- 数据目录管理 ---
+# 放行 data/raw 及其所有内容
+!data/raw/
+!data/raw/**
+
+# --- 全局大文件屏蔽 (双重保险，防止意外) ---
+*.npy
+*.pb
+*.DM
+*.ANI
+*.FA
+*.wfs
+*.chk
+*.ion
+*.xml
+*.bib
+*.err
+*.out
+CLOCK
+TIMES
+NON_TRIMMED_KP_LIST
+BASIS_*
+ORB.GAUSS.*
+slurm-*/

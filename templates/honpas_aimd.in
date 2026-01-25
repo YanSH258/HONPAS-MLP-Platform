@@ -1,0 +1,74 @@
+# -----------------------------------------------------------------------------
+# System Labeling (Controlled by Python)
+# -----------------------------------------------------------------------------
+SystemName          {SystemLabel}
+SystemLabel         {SystemLabel}
+
+# -----------------------------------------------------------------------------
+# DFT Settings (Fixed)
+# -----------------------------------------------------------------------------
+XC.functional       GGA
+XC.authors          PBE
+PAO.BasisSize       DZP
+PAO.EnergyShift     0.01 Ry
+MeshCutoff          300.0 Ry
+
+# -----------------------------------------------------------------------------
+# SCF Control
+# -----------------------------------------------------------------------------
+MaxSCFIterations    100
+DM.MixingWeight     0.05
+DM.Tolerance        1.d-4
+DM.NumberPulay      5
+SolutionMethod      Diagon
+
+# -----------------------------------------------------------------------------
+# MD Settings (Nose-Hoover NVT)
+# -----------------------------------------------------------------------------
+MD.TypeOfRun           Nose
+MD.InitialTemperature  300 K
+MD.TargetTemperature   300 K
+MD.LengthTimeStep      1.0 fs
+MD.FinalTimeStep       1000        
+MD.NoseMass            100.0 Ry*fs**2
+
+# Output Options (Crucial for MD)
+WriteCoorStep          .true.
+WriteForcesStep        .true.
+WriteForces            .true.
+WriteStressStep        .true.
+WriteMDHistory         .true.
+WriteMDXmol            .true.
+
+# -----------------------------------------------------------------------------
+# K-Points
+# -----------------------------------------------------------------------------
+%block kgrid_Monkhorst_Pack
+   2   0   0   0.0
+   0   2   0   0.0
+   0   0   2   0.0
+%endblock kgrid_Monkhorst_Pack
+
+# =============================================================================
+# DYNAMIC STRUCTURE BLOCK (Filled by Python Wrapper)
+# =============================================================================
+
+# 1. Species Definition
+NumberOfSpecies     {NumberOfSpecies}
+NumberOfAtoms       {NumberOfAtoms}
+
+%block ChemicalSpeciesLabel
+{SpeciesBlock}
+%endblock ChemicalSpeciesLabel
+
+# 2. Lattice Vectors
+LatticeConstant     1.0 Ang
+%block LatticeVectors
+{LatticeVectorsBlock}
+%endblock LatticeVectors
+
+# 3. Atomic Coordinates
+AtomicCoordinatesFormat  Ang
+%block AtomicCoordinatesAndAtomicSpecies
+{AtomicCoordinatesBlock}
+%endblock AtomicCoordinatesAndAtomicSpecies

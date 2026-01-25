@@ -1,0 +1,72 @@
+# -----------------------------------------------------------------------------
+# System Labeling (Controlled by Python)
+# -----------------------------------------------------------------------------
+SystemName          {SystemLabel}
+SystemLabel         {SystemLabel}
+
+# -----------------------------------------------------------------------------
+# Output options (Crucial for ML Training Data)
+# -----------------------------------------------------------------------------
+WriteForces         .true.      
+WriteCoorStep       .true.
+WriteForcesStep     .true.      
+WriteStressStep     .true.     
+WriteMullikenPop    1
+
+# -----------------------------------------------------------------------------
+# DFT Settings (XC, Basis, Mesh)
+# -----------------------------------------------------------------------------
+XC.functional       GGA
+XC.authors          PBE
+PAO.BasisSize       DZP         # 双Zeta加极化基组
+PAO.EnergyShift     0.01 Ry     # 基组截断能量
+MeshCutoff          300.0 Ry    # 网格精度
+
+# -----------------------------------------------------------------------------
+# SCF Control (Electronic Iteration)
+# -----------------------------------------------------------------------------
+MaxSCFIterations    100
+DM.MixingWeight     0.05        
+DM.Tolerance        1.d-4
+DM.NumberPulay      5
+SolutionMethod      Diagon     
+
+# -----------------------------------------------------------------------------
+# MD / Optimization (Set for Single Point Calculation)
+# -----------------------------------------------------------------------------
+MD.TypeOfRun        CG          # 共轭梯度法 (用于单点能计算或几何优化)
+MD.NumCGsteps       0           # 0 步表示只做 SCF，不移动原子 (单点能)
+MD.VariableCell     .false.    
+
+# -----------------------------------------------------------------------------
+# K-Points
+# -----------------------------------------------------------------------------
+%block kgrid_Monkhorst_Pack
+   2   0   0   0.0
+   0   2   0   0.0
+   0   0   2   0.0
+%endblock kgrid_Monkhorst_Pack
+
+# =============================================================================
+# DYNAMIC STRUCTURE BLOCK (Filled by Python Wrapper)
+# =============================================================================
+
+# 1. Species Definition
+NumberOfSpecies     {NumberOfSpecies}
+NumberOfAtoms       {NumberOfAtoms}
+
+%block ChemicalSpeciesLabel
+{SpeciesBlock}
+%endblock ChemicalSpeciesLabel
+
+# 2. Lattice Vectors
+LatticeConstant     1.0 Ang
+%block LatticeVectors
+{LatticeVectorsBlock}
+%endblock LatticeVectors
+
+# 3. Atomic Coordinates
+AtomicCoordinatesFormat  Ang
+%block AtomicCoordinatesAndAtomicSpecies
+{AtomicCoordinatesBlock}
+%endblock AtomicCoordinatesAndAtomicSpecies
